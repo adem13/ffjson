@@ -20,6 +20,7 @@ package ffjsoninception
 import (
 	"reflect"
 	"strconv"
+	"strings"
 	"text/template"
 )
 
@@ -52,11 +53,36 @@ func init() {
 		"handleFieldAddr": handleFieldAddr,
 		"unquoteField":    unquoteField,
 		"getTmpVarFor":    getTmpVarFor,
+		"getFieldSetFunc": getFieldSetFunc,
+		"getFieldType":    getFieldType,
 	}
 
 	for k, v := range funcs {
 		decodeTpl[k] = template.Must(template.New(k).Funcs(tplFuncs).Parse(v))
 	}
+}
+
+func getFieldType(typ reflect.Type) string {
+	s := typ.Name()
+
+	if s == "" {
+		s = typ.String()
+	}
+
+	if s == "Time" {
+		s = "time.Time"
+	}
+
+	return s
+}
+
+func getFieldSetFunc(name string) string {
+	ns := strings.Split(name, ".")
+	if len(ns) != 2 {
+		return ""
+	}
+
+	return ns[0] + `.SetField("` + ns[1] + `")`
 }
 
 type handlerNumeric struct {
@@ -91,6 +117,9 @@ var handlerNumericTxt = `
 		{{else}}
 		{{.Name}} = {{getType $ic .Name .Typ}}(tval)
 		{{end}}
+		
+		//handlerNumericTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -126,6 +155,9 @@ var handleFallbackTxt = `
 	if err != nil {
 		return fs.WrapErr(err)
 	}
+
+	//handleFallbackTxt
+	{{getFieldSetFunc .Name}}
 }
 `
 
@@ -158,6 +190,9 @@ var handleStringTxt = `
 		{{unquoteField .Quoted}}
 		{{.Name}} = {{getType $ic .Name .Typ}}(string(outBuf))
 	{{end}}
+
+	//handleStringTxt
+	{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -269,6 +304,9 @@ var handleObjectTxt = `
 		{{if eq .TakeAddr true}}
 		{{.Name}} = &tval
 		{{end}}
+
+		//handleObjectTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -335,6 +373,9 @@ var handleArrayTxt = `
 
 			wantVal = false
 		}
+
+		//handleArrayTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -399,6 +440,9 @@ var handleSliceTxt = `
 			{{end}}
 			wantVal = false
 		}
+
+		//handleSliceTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -420,6 +464,9 @@ var handleByteSliceTxt = `
 		{{else}}
 			{{.Name}} = append([]byte(), b[0:n]...)
 		{{end}}
+
+		//handleByteSliceTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -463,6 +510,9 @@ var handleBoolTxt = `
 		{{if eq .TakeAddr true}}
 		{{.Name}} = &tval
 		{{end}}
+
+		//handleBoolTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -486,6 +536,9 @@ var handlePtrTxt = `
 		}
 
 		{{handleFieldAddr .IC .Name true .Typ.Elem false .Quoted}}
+
+		//handlePtrTxt
+		{{getFieldSetFunc .Name}}
 	}
 }
 `
@@ -529,7 +582,44 @@ var ujFuncTxt = `
 {{$si := .SI}}
 {{$ic := .IC}}
 
+func New{{.SI.Name}}() *{{.SI.Name}} {
+	uj := &{{.SI.Name}}{}
+	uj.ResetField()
+	return uj
+}
+
+func (uj *{{$.SI.Name}}) ResetField() {
+	if uj.fieldSet == nil {
+		uj.fieldSet = make(map[string]bool)
+	}
+	
+	{{range $index, $field := $si.Fields}}
+	uj.fieldSet["{{$field.Name}}"] = false
+	{{end}}
+}
+
+func (uj *{{$.SI.Name}}) SetField(fieldName string, isSet ...bool) {
+	if len(isSet) == 1 {
+		uj.fieldSet[fieldName] = isSet[0]
+		return
+	}
+	
+	uj.fieldSet[fieldName] = true
+}
+
+{{range $index, $field := $si.Fields}}
+func (uj *{{$.SI.Name}}) Is{{$field.Name}}() bool {
+	return uj.fieldSet["{{$field.Name}}"]
+}
+func (uj *{{$.SI.Name}}) Set{{$field.Name}}(val {{getFieldType .Typ}}) {
+	uj.{{$field.Name}} = val
+	uj.SetField("{{$field.Name}}")
+}
+{{end}}
+
 func (uj *{{.SI.Name}}) UnmarshalJSON(input []byte) error {
+	uj.ResetField()
+
 	fs := fflib.NewFFLexer(input)
     return uj.UnmarshalJSONFFLexer(fs, fflib.FFParse_map_start)
 }
@@ -740,6 +830,9 @@ var handleUnmarshalerTxt = `
 			return err
 		}
 		state = fflib.FFParse_after_value
+
+		//handleUnmarshalerTxt
+		{{getFieldSetFunc .Name}}
 	}
 	{{else}}
 	{{if eq .Unmarshaler true}}
@@ -767,6 +860,9 @@ var handleUnmarshalerTxt = `
 			return fs.WrapErr(err)
 		}
 		state = fflib.FFParse_after_value
+
+		//handleUnmarshalerTxt
+		{{getFieldSetFunc .Name}}
 	}
 	{{end}}
 	{{end}}
