@@ -151,7 +151,7 @@ func TestFuzzCycle(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		if true || i > 0 {
 			// TODO: Re-enable after fixing:
-			// https://github.com/pquerna/ffjson/issues/82
+			// https://github.com/yingshengtech/ffjson/issues/82
 			f.RandSource(rand.New(rand.NewSource(int64(i * 324221))))
 			f.Fuzz(&r)
 		}
@@ -378,7 +378,7 @@ func TestFuzzStringCycle(t *testing.T) {
 		// Therefore tests on byte arrays are removed, since the golang decoder chokes on them.
 		testSameMarshal(t, &r, &rFF)
 
-		// Test for https://github.com/pquerna/ffjson/issues/80
+		// Test for https://github.com/yingshengtech/ffjson/issues/80
 		//		testCycle(t, &r, &rFF)
 	}
 }

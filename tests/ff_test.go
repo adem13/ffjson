@@ -18,9 +18,9 @@
 package tff
 
 import (
-	"github.com/pquerna/ffjson/ffjson"
-	fflib "github.com/pquerna/ffjson/fflib/v1"
 	"github.com/stretchr/testify/require"
+	"github.com/yingshengtech/ffjson/ffjson"
+	fflib "github.com/yingshengtech/ffjson/fflib/v1"
 
 	"bytes"
 	"encoding/gob"

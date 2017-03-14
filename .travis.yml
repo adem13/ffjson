@@ -1,7 +1,7 @@
 language: go
 
 install:
-  - A=${PWD#*github.com/};A=${A%/ffjson};cd ../..;mv $A pquerna;cd pquerna/ffjson
+  - A=${PWD#*github.com/};A=${A%/ffjson};cd ../..;mv $A pquerna;cd yingshengtech/ffjson
   - go get -d -v ./...
   - go get -u github.com/stretchr/testify/require
   - go get -u github.com/google/gofuzz

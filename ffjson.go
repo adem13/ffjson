@@ -18,9 +18,9 @@
 package main
 
 import (
-	_ "github.com/pquerna/ffjson/fflib/v1"
-	"github.com/pquerna/ffjson/generator"
-	_ "github.com/pquerna/ffjson/inception"
+	_ "github.com/yingshengtech/ffjson/fflib/v1"
+	"github.com/yingshengtech/ffjson/generator"
+	_ "github.com/yingshengtech/ffjson/inception"
 
 	"flag"
 	"fmt"
