@@ -35,6 +35,9 @@ var importNameFlag = flag.String("import-name", "", "Override import name in cas
 var forceRegenerateFlag = flag.Bool("force-regenerate", false, "Regenerate every input file, without checking modification date.")
 var resetFields = flag.Bool("reset-fields", false, "When unmarshalling reset all fields missing in the JSON")
 
+//增加forceRegenerateFlag参数的简短选项
+var forceRegenerateFlagShort = flag.Bool("f", false, "Regenerate every input file, without checking modification date.")
+
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "\t%s [options] [input_file]\n\n", os.Args[0])
@@ -72,6 +75,10 @@ func main() {
 	var importName string
 	if importNameFlag != nil && *importNameFlag != "" {
 		importName = *importNameFlag
+	}
+
+	if *forceRegenerateFlagShort {
+		*forceRegenerateFlag = true
 	}
 
 	err := generator.GenerateFiles(goCmd, inputPath, outputPath, importName, *forceRegenerateFlag, *resetFields)

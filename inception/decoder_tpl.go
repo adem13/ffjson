@@ -588,6 +588,19 @@ func New{{.SI.Name}}() *{{.SI.Name}} {
 	return uj
 }
 
+//FieldSetedNames 列出所有已赋值的字段名称列表
+func (uj *{{$.SI.Name}}) FieldSetedNames() []string {
+	names := make([]string, 0, len(uj.fieldSet))
+	for k, v := range uj.fieldSet {
+		if v {
+			names = append(names, k)
+		}
+	}
+
+	return names
+}
+
+//ResetField 重置所有字段的赋值标识为:false，字段内容并不会清空
 func (uj *{{$.SI.Name}}) ResetField() {
 	if uj.fieldSet == nil {
 		uj.fieldSet = make(map[string]bool)
@@ -598,6 +611,7 @@ func (uj *{{$.SI.Name}}) ResetField() {
 	{{end}}
 }
 
+//SetField 设置字段的赋值标识，isSet不传时，默认:true
 func (uj *{{$.SI.Name}}) SetField(fieldName string, isSet ...bool) {
 	if len(isSet) == 1 {
 		uj.fieldSet[fieldName] = isSet[0]
@@ -608,9 +622,12 @@ func (uj *{{$.SI.Name}}) SetField(fieldName string, isSet ...bool) {
 }
 
 {{range $index, $field := $si.Fields}}
+//Is{{$field.Name}} {{$field.Name}}是否已赋值（赋值标识）
 func (uj *{{$.SI.Name}}) Is{{$field.Name}}() bool {
 	return uj.fieldSet["{{$field.Name}}"]
 }
+
+//Set{{$field.Name}} 设置{{$field.Name}}的值，并将赋值标识设为:true
 func (uj *{{$.SI.Name}}) Set{{$field.Name}}(val {{getFieldType .Typ}}) {
 	uj.{{$field.Name}} = val
 	uj.SetField("{{$field.Name}}")
