@@ -29,6 +29,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/yingshengtech/ffjson/inception"
 	"github.com/yingshengtech/ffjson/shared"
 )
 
@@ -226,11 +227,16 @@ func (im *InceptionMain) Run() error {
 	err := cmd.Run()
 
 	if err != nil {
-		return errors.New(
-			fmt.Sprintf("Go Run Failed for: %s\nSTDOUT:\n%s\nSTDERR:\n%s\n",
-				im.TempMainPath,
-				string(out.Bytes()),
-				string(errOut.Bytes())))
+		errStr := string(errOut.Bytes())
+		if strings.Contains(errStr, ffjsoninception.ErrorModel.Error()) {
+			err = ffjsoninception.ErrorModel
+		} else {
+			return errors.New(
+				fmt.Sprintf("Go Run Failed for: %s\nSTDOUT:\n%s\nSTDERR:\n%s\n",
+					im.TempMainPath,
+					string(out.Bytes()),
+					errStr))
+		}
 	}
 
 	defer func() {
@@ -247,5 +253,5 @@ func (im *InceptionMain) Run() error {
 		os.Remove(im.tempDir)
 	}()
 
-	return nil
+	return err
 }

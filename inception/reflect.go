@@ -18,11 +18,14 @@
 package ffjsoninception
 
 import (
+	"errors"
+
 	fflib "github.com/yingshengtech/ffjson/fflib/v1"
 	"github.com/yingshengtech/ffjson/shared"
 
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"unicode/utf8"
 )
@@ -54,8 +57,24 @@ type StructInfo struct {
 	Options shared.StructOptions
 }
 
+var ErrorModel = errors.New("model缺少 fieldSet 字段，类型为：map[string]bool")
+
 func NewStructInfo(obj shared.InceptionType) *StructInfo {
 	t := reflect.TypeOf(obj.Obj)
+
+	isModel := false
+	for i := 0; i < t.NumField(); i++ {
+		tp := fmt.Sprintf("%v", t.Field(i).Type)
+		if t.Field(i).Name == "fieldSet" && tp == "map[string]bool" {
+			isModel = true
+			break
+		}
+	}
+
+	if !isModel {
+		panic(ErrorModel)
+	}
+
 	return &StructInfo{
 		Obj:     obj.Obj,
 		Name:    t.Name(),

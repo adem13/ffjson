@@ -65,10 +65,7 @@ func handleField(ic *Inception, name string, typ reflect.Type, ptr bool, quoted 
 }
 
 func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type, ptr bool, quoted bool) string {
-	timeTyp := getFieldType(typ)
-	if timeTyp == "time.Time" {
-		ic.OutputImports[`"time"`] = true
-	}
+	autoImport(ic, typ)
 
 	out := fmt.Sprintf("/* handler: %s type=%v kind=%v quoted=%t*/\n", name, typ, typ.Kind(), quoted)
 

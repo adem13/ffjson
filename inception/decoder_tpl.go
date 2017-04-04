@@ -18,6 +18,7 @@
 package ffjsoninception
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -62,18 +63,19 @@ func init() {
 	}
 }
 
+func autoImport(ic *Inception, typ reflect.Type) {
+	s := getFieldType(typ)
+
+	switch s {
+	case "time.Time":
+		ic.OutputImports[`"time"`] = true
+	case "tp.Datetime":
+		ic.OutputImports[`"git.oschina.net/ystech/go-component/tp"`] = true
+	}
+}
+
 func getFieldType(typ reflect.Type) string {
-	s := typ.Name()
-
-	if s == "" {
-		s = typ.String()
-	}
-
-	if s == "Time" {
-		s = "time.Time"
-	}
-
-	return s
+	return fmt.Sprintf("%v", typ)
 }
 
 func getFieldSetFunc(name string) string {
