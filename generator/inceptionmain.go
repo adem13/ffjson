@@ -231,7 +231,7 @@ func (im *InceptionMain) Run() error {
 		if strings.Contains(errStr, ffjsoninception.ErrorModel.Error()) {
 			err = ffjsoninception.ErrorModel
 		} else {
-			return errors.New(
+			err = errors.New(
 				fmt.Sprintf("Go Run Failed for: %s\nSTDOUT:\n%s\nSTDERR:\n%s\n",
 					im.TempMainPath,
 					string(out.Bytes()),
