@@ -47,15 +47,15 @@ func init() {
 	}
 
 	tplFuncs := template.FuncMap{
-		"getAllowTokens":  getAllowTokens,
-		"getNumberSize":   getNumberSize,
-		"getType":         getType,
-		"handleField":     handleField,
-		"handleFieldAddr": handleFieldAddr,
-		"unquoteField":    unquoteField,
-		"getTmpVarFor":    getTmpVarFor,
-		"getFieldSetFunc": getFieldSetFunc,
-		"getFieldType":    getFieldType,
+		"getAllowTokens":      getAllowTokens,
+		"getNumberSize":       getNumberSize,
+		"getType":             getType,
+		"handleField":         handleField,
+		"handleFieldAddr":     handleFieldAddr,
+		"unquoteField":        unquoteField,
+		"getTmpVarFor":        getTmpVarFor,
+		"getSetFieldMarkFunc": getSetFieldMarkFunc,
+		"getFieldType":        getFieldType,
 	}
 
 	for k, v := range funcs {
@@ -78,13 +78,13 @@ func getFieldType(typ reflect.Type) string {
 	return fmt.Sprintf("%v", typ)
 }
 
-func getFieldSetFunc(name string) string {
+func getSetFieldMarkFunc(name string) string {
 	ns := strings.Split(name, ".")
 	if len(ns) != 2 {
 		return ""
 	}
 
-	return ns[0] + `.SetField("` + ns[1] + `")`
+	return ns[0] + `.SetFieldMark("` + ns[1] + `")`
 }
 
 type handlerNumeric struct {
@@ -121,7 +121,7 @@ var handlerNumericTxt = `
 		{{end}}
 		
 		//handlerNumericTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -159,7 +159,7 @@ var handleFallbackTxt = `
 	}
 
 	//handleFallbackTxt
-	{{getFieldSetFunc .Name}}
+	{{getSetFieldMarkFunc .Name}}
 }
 `
 
@@ -194,7 +194,7 @@ var handleStringTxt = `
 	{{end}}
 
 	//handleStringTxt
-	{{getFieldSetFunc .Name}}
+	{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -308,7 +308,7 @@ var handleObjectTxt = `
 		{{end}}
 
 		//handleObjectTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -377,7 +377,7 @@ var handleArrayTxt = `
 		}
 
 		//handleArrayTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -444,7 +444,7 @@ var handleSliceTxt = `
 		}
 
 		//handleSliceTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -468,7 +468,7 @@ var handleByteSliceTxt = `
 		{{end}}
 
 		//handleByteSliceTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -514,7 +514,7 @@ var handleBoolTxt = `
 		{{end}}
 
 		//handleBoolTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -540,7 +540,7 @@ var handlePtrTxt = `
 		{{handleFieldAddr .IC .Name true .Typ.Elem false .Quoted}}
 
 		//handlePtrTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 }
 `
@@ -586,14 +586,14 @@ var ujFuncTxt = `
 
 func New{{.SI.Name}}() *{{.SI.Name}} {
 	uj := &{{.SI.Name}}{}
-	uj.ResetField()
+	uj.ResetFieldMark()
 	return uj
 }
 
-//FieldSetedNames 列出所有已赋值的字段名称列表
-func (uj *{{$.SI.Name}}) FieldSetedNames() []string {
-	names := make([]string, 0, len(uj.fieldSet))
-	for k, v := range uj.fieldSet {
+//FieldMarks 列出所有已赋值的字段名称列表
+func (uj *{{$.SI.Name}}) FieldMarks() []string {
+	names := make([]string, 0, len(uj.fieldMark))
+	for k, v := range uj.fieldMark {
 		if v {
 			names = append(names, k)
 		}
@@ -602,42 +602,86 @@ func (uj *{{$.SI.Name}}) FieldSetedNames() []string {
 	return names
 }
 
-//ResetField 重置所有字段的赋值标识为:false，字段内容并不会清空
-func (uj *{{$.SI.Name}}) ResetField() {
-	if uj.fieldSet == nil {
-		uj.fieldSet = make(map[string]bool)
+//ResetFieldMark 重置所有字段的赋值标识为:false，字段内容并不会清空
+func (uj *{{$.SI.Name}}) ResetFieldMark() {
+	if uj.fieldMark == nil {
+		uj.fieldMark = make(map[string]bool)
 	}
 	
 	{{range $index, $field := $si.Fields}}
-	uj.fieldSet["{{$field.Name}}"] = false
+	uj.fieldMark["{{$field.Name}}"] = false
 	{{end}}
 }
 
-//SetField 设置字段的赋值标识，isSet不传时，默认:true
-func (uj *{{$.SI.Name}}) SetField(fieldName string, isSet ...bool) {
-	if len(isSet) == 1 {
-		uj.fieldSet[fieldName] = isSet[0]
+//SetFieldMark 设置字段的赋值标识，isMark不传时，默认:true
+func (uj *{{$.SI.Name}}) SetFieldMark(fieldName string, isMark ...bool) {
+	if len(isMark) == 1 {
+		uj.fieldMark[fieldName] = isMark[0]
 		return
 	}
 	
-	uj.fieldSet[fieldName] = true
+	uj.fieldMark[fieldName] = true
 }
 
 {{range $index, $field := $si.Fields}}
-//Is{{$field.Name}} {{$field.Name}}是否已赋值（赋值标识）
-func (uj *{{$.SI.Name}}) Is{{$field.Name}}() bool {
-	return uj.fieldSet["{{$field.Name}}"]
+//{{$field.Name}}Mark {{$field.Name}}是否已赋值（赋值标识）
+func (uj *{{$.SI.Name}}) {{$field.Name}}Mark() bool {
+	return uj.fieldMark["{{$field.Name}}"]
 }
 
 //Set{{$field.Name}} 设置{{$field.Name}}的值，并将赋值标识设为:true
 func (uj *{{$.SI.Name}}) Set{{$field.Name}}(val {{getFieldType .Typ}}) {
 	uj.{{$field.Name}} = val
-	uj.SetField("{{$field.Name}}")
+	uj.SetFieldMark("{{$field.Name}}")
 }
 {{end}}
 
+func (uj *{{$.SI.Name}}) autoSetFieldValue(jsonBytes *bytes.Buffer, typ, key, val string) {
+	strType := "string,tp.Datetime,time.Time"
+
+	jsonBytes.WriteString("\"")
+	jsonBytes.WriteString(key)
+	jsonBytes.WriteString("\":")
+
+	if strings.Contains(strType, typ) {
+		jsonBytes.WriteString("\"")
+		jsonBytes.WriteString(val)
+		jsonBytes.WriteString("\"")
+	} else {
+		jsonBytes.WriteString(val)
+	}
+}
+
+//AutoSetFieldValue 根据map自动设置字段值
+func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
+	if len(pm) == 0 {
+		return nil
+	}
+
+	jsonBytes := bytes.NewBufferString("{")
+	i := 0
+	for k, v := range pm {
+		if i > 0 {
+			jsonBytes.WriteString(",")
+		}
+
+		fieldName := strings.ToLower(k)
+		switch fieldName {
+			{{range $index, $field := $si.Fields}}
+			case strings.ToLower("{{$field.Name}}"):
+				uj.autoSetFieldValue(jsonBytes, "{{getFieldType .Typ}}", k, v)
+			{{end}}
+		}
+
+		i++
+	}
+	jsonBytes.WriteString("}")
+
+	return uj.UnmarshalJSON(jsonBytes.Bytes())
+}
+
 func (uj *{{.SI.Name}}) UnmarshalJSON(input []byte) error {
-	uj.ResetField()
+	uj.ResetFieldMark()
 
 	fs := fflib.NewFFLexer(input)
     return uj.UnmarshalJSONFFLexer(fs, fflib.FFParse_map_start)
@@ -851,7 +895,7 @@ var handleUnmarshalerTxt = `
 		state = fflib.FFParse_after_value
 
 		//handleUnmarshalerTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 	{{else}}
 	{{if eq .Unmarshaler true}}
@@ -881,7 +925,7 @@ var handleUnmarshalerTxt = `
 		state = fflib.FFParse_after_value
 
 		//handleUnmarshalerTxt
-		{{getFieldSetFunc .Name}}
+		{{getSetFieldMarkFunc .Name}}
 	}
 	{{end}}
 	{{end}}

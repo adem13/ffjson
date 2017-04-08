@@ -37,6 +37,7 @@ var validValues []string = []string{
 
 func CreateUnmarshalJSON(ic *Inception, si *StructInfo) error {
 	out := ""
+	ic.OutputImports[`"strings"`] = true
 	ic.OutputImports[`fflib "github.com/yingshengtech/ffjson/fflib/v1"`] = true
 	if len(si.Fields) > 0 {
 		ic.OutputImports[`"bytes"`] = true

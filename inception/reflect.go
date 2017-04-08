@@ -57,7 +57,7 @@ type StructInfo struct {
 	Options shared.StructOptions
 }
 
-var ErrorModel = errors.New("model缺少 fieldSet 字段，类型为：map[string]bool `xorm:\"-\"`")
+var ErrorModel = errors.New("model缺少 fieldMark 字段，类型为：map[string]bool `xorm:\"-\"`")
 
 func NewStructInfo(obj shared.InceptionType) *StructInfo {
 	t := reflect.TypeOf(obj.Obj)
@@ -65,7 +65,7 @@ func NewStructInfo(obj shared.InceptionType) *StructInfo {
 	isModel := false
 	for i := 0; i < t.NumField(); i++ {
 		tp := fmt.Sprintf("%v", t.Field(i).Type)
-		if t.Field(i).Name == "fieldSet" && tp == "map[string]bool" && t.Field(i).Tag == `xorm:"-"` {
+		if t.Field(i).Name == "fieldMark" && tp == "map[string]bool" && t.Field(i).Tag == `xorm:"-"` {
 			isModel = true
 			break
 		}
