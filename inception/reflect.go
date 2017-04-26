@@ -57,7 +57,7 @@ type StructInfo struct {
 	Options shared.StructOptions
 }
 
-var ErrorModel = errors.New("model缺少 fieldMark 字段，类型为：map[string]bool `xorm:\"-\"`")
+var ErrorModel = errors.New("model缺少 fieldMark map[string]bool `xorm:\"-\"`")
 
 func NewStructInfo(obj shared.InceptionType) *StructInfo {
 	t := reflect.TypeOf(obj.Obj)

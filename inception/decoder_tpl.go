@@ -590,6 +590,13 @@ func New{{.SI.Name}}() *{{.SI.Name}} {
 	return uj
 }
 
+//NewItems 创建对应的切片指针对象，配合 go-component/orm 组件
+func (uj *{{$.SI.Name}}) NewItems() interface{} {
+	items := new([]{{$.SI.Name}})
+	*items = make([]{{$.SI.Name}}, 0)
+	return items
+}
+
 //FieldMarks 列出所有已赋值的字段名称列表
 func (uj *{{$.SI.Name}}) FieldMarks() []string {
 	names := make([]string, 0, len(uj.fieldMark))
