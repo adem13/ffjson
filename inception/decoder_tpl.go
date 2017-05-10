@@ -666,9 +666,8 @@ func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
 	}
 
 	jsonBytes := bytes.NewBufferString("{")
-	i := 0
 	for k, v := range pm {
-		if i > 0 {
+		if jsonBytes.Len() > 1 {
 			jsonBytes.WriteString(",")
 		}
 
@@ -679,8 +678,6 @@ func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
 				uj.autoSetFieldValue(jsonBytes, "{{getFieldType .Typ}}", k, v)
 			{{end}}
 		}
-
-		i++
 	}
 	jsonBytes.WriteString("}")
 
