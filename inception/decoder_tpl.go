@@ -646,6 +646,10 @@ func (uj *{{$.SI.Name}}) Set{{$field.Name}}(val {{getFieldType .Typ}}) {
 func (uj *{{$.SI.Name}}) autoSetFieldValue(jsonBytes *bytes.Buffer, typ, key, val string) {
 	strType := "string,tp.Datetime,time.Time"
 
+	if jsonBytes.Len() > 1 {
+		jsonBytes.WriteString(",")
+	}
+
 	jsonBytes.WriteString("\"")
 	jsonBytes.WriteString(key)
 	jsonBytes.WriteString("\":")
@@ -667,10 +671,6 @@ func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
 
 	jsonBytes := bytes.NewBufferString("{")
 	for k, v := range pm {
-		if jsonBytes.Len() > 1 {
-			jsonBytes.WriteString(",")
-		}
-
 		fieldName := strings.ToLower(k)
 		switch fieldName {
 			{{range $index, $field := $si.Fields}}
