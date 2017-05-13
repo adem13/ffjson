@@ -676,7 +676,7 @@ func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
 			{{range $index, $field := $si.Fields}}
 				{{if ne $field.JsonName "-"}}
 			case strings.ToLower("{{$field.JsonName}}"):
-				uj.autoSetFieldValue(jsonBytes, "{{getFieldType .Typ}}", {{$field.JsonName}}, v)
+				uj.autoSetFieldValue(jsonBytes, "{{getFieldType .Typ}}", "{{$field.JsonName}}", v)
 				{{end}}
 			{{end}}
 		}
