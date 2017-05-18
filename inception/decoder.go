@@ -38,6 +38,7 @@ var validValues []string = []string{
 func CreateUnmarshalJSON(ic *Inception, si *StructInfo) error {
 	out := ""
 	ic.OutputImports[`"strings"`] = true
+	ic.OutputImports[`"errors"`] = true
 	ic.OutputImports[`fflib "github.com/yingshengtech/ffjson/fflib/v1"`] = true
 	if len(si.Fields) > 0 {
 		ic.OutputImports[`"bytes"`] = true
@@ -61,12 +62,21 @@ func CreateUnmarshalJSON(ic *Inception, si *StructInfo) error {
 	return nil
 }
 
-func handleField(ic *Inception, name string, typ reflect.Type, ptr bool, quoted bool) string {
-	return handleFieldAddr(ic, name, false, typ, ptr, quoted)
+func handleField(ic *Inception, name, jsonName string, typ reflect.Type, ptr bool, quoted bool) string {
+	return handleFieldAddr(ic, name, jsonName, false, typ, ptr, quoted)
 }
 
-func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type, ptr bool, quoted bool) string {
+func handleFieldAddr(ic *Inception, name, jsonName string, takeAddr bool, typ reflect.Type, ptr bool, quoted bool) string {
 	autoImport(ic, typ)
+
+	if jsonName == "-" {
+		ns := strings.Split(name, ".")
+		if len(ns) != 2 {
+			jsonName = ""
+		} else {
+			jsonName = ns[1]
+		}
+	}
 
 	out := fmt.Sprintf("/* handler: %s type=%v kind=%v quoted=%t*/\n", name, typ, typ.Kind(), quoted)
 
@@ -78,6 +88,7 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 	out += tplStr(decodeTpl["handleUnmarshaler"], handleUnmarshaler{
 		IC:                   ic,
 		Name:                 name,
+		JsonName:             jsonName,
 		Typ:                  typ,
 		Ptr:                  reflect.Ptr,
 		TakeAddr:             takeAddr || ptr,
@@ -98,9 +109,9 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 		reflect.Int64:
 
 		allowed := buildTokens(quoted, "FFTok_string", "FFTok_integer", "FFTok_null")
-		out += getAllowTokens(typ.Name(), allowed...)
+		out += getAllowTokens(typ.Name(), jsonName, allowed...)
 
-		out += getNumberHandler(ic, name, takeAddr || ptr, typ, "ParseInt")
+		out += getNumberHandler(ic, name, jsonName, takeAddr || ptr, typ, "ParseInt")
 
 	case reflect.Uint,
 		reflect.Uint8,
@@ -109,42 +120,44 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 		reflect.Uint64:
 
 		allowed := buildTokens(quoted, "FFTok_string", "FFTok_integer", "FFTok_null")
-		out += getAllowTokens(typ.Name(), allowed...)
+		out += getAllowTokens(typ.Name(), jsonName, allowed...)
 
-		out += getNumberHandler(ic, name, takeAddr || ptr, typ, "ParseUint")
+		out += getNumberHandler(ic, name, jsonName, takeAddr || ptr, typ, "ParseUint")
 
 	case reflect.Float32,
 		reflect.Float64:
 
 		allowed := buildTokens(quoted, "FFTok_string", "FFTok_double", "FFTok_integer", "FFTok_null")
-		out += getAllowTokens(typ.Name(), allowed...)
+		out += getAllowTokens(typ.Name(), jsonName, allowed...)
 
-		out += getNumberHandler(ic, name, takeAddr || ptr, typ, "ParseFloat")
+		out += getNumberHandler(ic, name, jsonName, takeAddr || ptr, typ, "ParseFloat")
 
 	case reflect.Bool:
 		ic.OutputImports[`"bytes"`] = true
 		ic.OutputImports[`"errors"`] = true
 
 		allowed := buildTokens(quoted, "FFTok_string", "FFTok_bool", "FFTok_null")
-		out += getAllowTokens(typ.Name(), allowed...)
+		out += getAllowTokens(typ.Name(), jsonName, allowed...)
 
 		out += tplStr(decodeTpl["handleBool"], handleBool{
 			Name:     name,
+			JsonName: jsonName,
 			Typ:      typ,
 			TakeAddr: takeAddr || ptr,
 		})
 
 	case reflect.Ptr:
 		out += tplStr(decodeTpl["handlePtr"], handlePtr{
-			IC:     ic,
-			Name:   name,
-			Typ:    typ,
-			Quoted: quoted,
+			IC:       ic,
+			Name:     name,
+			JsonName: jsonName,
+			Typ:      typ,
+			Quoted:   quoted,
 		})
 
 	case reflect.Array,
 		reflect.Slice:
-		out += getArrayHandler(ic, name, typ, ptr)
+		out += getArrayHandler(ic, name, jsonName, typ, ptr)
 
 	case reflect.String:
 		// Is it a json.Number?
@@ -153,14 +166,16 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 			// See: https://github.com/golang/go/blob/f05c3aa24d815cd3869153750c9875e35fc48a6e/src/encoding/json/decode.go#L897
 			ic.OutputImports[`"encoding/json"`] = true
 			out += tplStr(decodeTpl["handleFallback"], handleFallback{
-				Name: name,
-				Typ:  typ,
-				Kind: typ.Kind(),
+				Name:     name,
+				JsonName: jsonName,
+				Typ:      typ,
+				Kind:     typ.Kind(),
 			})
 		} else {
 			out += tplStr(decodeTpl["handleString"], handleString{
 				IC:       ic,
 				Name:     name,
+				JsonName: jsonName,
 				Typ:      typ,
 				TakeAddr: takeAddr || ptr,
 				Quoted:   quoted,
@@ -169,14 +184,16 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 	case reflect.Interface:
 		ic.OutputImports[`"encoding/json"`] = true
 		out += tplStr(decodeTpl["handleFallback"], handleFallback{
-			Name: name,
-			Typ:  typ,
-			Kind: typ.Kind(),
+			Name:     name,
+			JsonName: jsonName,
+			Typ:      typ,
+			Kind:     typ.Kind(),
 		})
 	case reflect.Map:
 		out += tplStr(decodeTpl["handleObject"], handleObject{
 			IC:       ic,
 			Name:     name,
+			JsonName: jsonName,
 			Typ:      typ,
 			Ptr:      reflect.Ptr,
 			TakeAddr: takeAddr || ptr,
@@ -184,16 +201,17 @@ func handleFieldAddr(ic *Inception, name string, takeAddr bool, typ reflect.Type
 	default:
 		ic.OutputImports[`"encoding/json"`] = true
 		out += tplStr(decodeTpl["handleFallback"], handleFallback{
-			Name: name,
-			Typ:  typ,
-			Kind: typ.Kind(),
+			Name:     name,
+			JsonName: jsonName,
+			Typ:      typ,
+			Kind:     typ.Kind(),
 		})
 	}
 
 	return out
 }
 
-func getArrayHandler(ic *Inception, name string, typ reflect.Type, ptr bool) string {
+func getArrayHandler(ic *Inception, name, jsonName string, typ reflect.Type, ptr bool) string {
 	if typ.Kind() == reflect.Slice && typ.Elem().Kind() == reflect.Uint8 {
 		ic.OutputImports[`"encoding/base64"`] = true
 		useReflectToSet := false
@@ -205,6 +223,7 @@ func getArrayHandler(ic *Inception, name string, typ reflect.Type, ptr bool) str
 		return tplStr(decodeTpl["handleByteSlice"], handleArray{
 			IC:              ic,
 			Name:            name,
+			JsonName:        jsonName,
 			Typ:             typ,
 			Ptr:             reflect.Ptr,
 			UseReflectToSet: useReflectToSet,
@@ -221,9 +240,10 @@ func getArrayHandler(ic *Inception, name string, typ reflect.Type, ptr bool) str
 		ic.OutputImports[`"encoding/json"`] = true
 
 		return tplStr(decodeTpl["handleFallback"], handleFallback{
-			Name: name,
-			Typ:  typ,
-			Kind: typ.Kind(),
+			Name:     name,
+			JsonName: jsonName,
+			Typ:      typ,
+			Kind:     typ.Kind(),
 		})
 	}
 
@@ -231,34 +251,38 @@ sliceOrArray:
 
 	if typ.Kind() == reflect.Array {
 		return tplStr(decodeTpl["handleArray"], handleArray{
-			IC:    ic,
-			Name:  name,
-			Typ:   typ,
-			IsPtr: ptr,
-			Ptr:   reflect.Ptr,
+			IC:       ic,
+			Name:     name,
+			JsonName: jsonName,
+			Typ:      typ,
+			IsPtr:    ptr,
+			Ptr:      reflect.Ptr,
 		})
 	}
 
 	return tplStr(decodeTpl["handleSlice"], handleArray{
-		IC:    ic,
-		Name:  name,
-		Typ:   typ,
-		IsPtr: ptr,
-		Ptr:   reflect.Ptr,
+		IC:       ic,
+		Name:     name,
+		JsonName: jsonName,
+		Typ:      typ,
+		IsPtr:    ptr,
+		Ptr:      reflect.Ptr,
 	})
 }
 
-func getAllowTokens(name string, tokens ...string) string {
+func getAllowTokens(name, jsonName string, tokens ...string) string {
 	return tplStr(decodeTpl["allowTokens"], allowTokens{
-		Name:   name,
-		Tokens: tokens,
+		Name:     name,
+		JsonName: jsonName,
+		Tokens:   tokens,
 	})
 }
 
-func getNumberHandler(ic *Inception, name string, takeAddr bool, typ reflect.Type, parsefunc string) string {
+func getNumberHandler(ic *Inception, name, jsonName string, takeAddr bool, typ reflect.Type, parsefunc string) string {
 	return tplStr(decodeTpl["handlerNumeric"], handlerNumeric{
 		IC:        ic,
 		Name:      name,
+		JsonName:  jsonName,
 		ParseFunc: parsefunc,
 		TakeAddr:  takeAddr,
 		Typ:       typ,

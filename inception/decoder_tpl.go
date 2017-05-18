@@ -90,6 +90,7 @@ func getSetFieldMarkFunc(name string) string {
 type handlerNumeric struct {
 	IC        *Inception
 	Name      string
+	JsonName  string
 	ParseFunc string
 	Typ       reflect.Type
 	TakeAddr  bool
@@ -111,7 +112,8 @@ var handlerNumericTxt = `
 		{{end}}
 
 		if err != nil {
-			return fs.WrapErr(err)
+			//return fs.WrapErr(err)
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 		{{if eq .TakeAddr true}}
 		ttypval := {{getType $ic .Name .Typ}}(tval)
@@ -127,22 +129,25 @@ var handlerNumericTxt = `
 `
 
 type allowTokens struct {
-	Name   string
-	Tokens []string
+	Name     string
+	JsonName string
+	Tokens   []string
 }
 
 var allowTokensTxt = `
 {
 	if {{range $index, $element := .Tokens}}{{if ne $index 0 }}&&{{end}} tok != fflib.{{$element}}{{end}} {
-		return fs.WrapErr(fmt.Errorf("cannot unmarshal %s into Go value for {{.Name}}", tok))
+		//return fs.WrapErr(fmt.Errorf("cannot unmarshal %s into Go value for {{.Name}}", tok))
+		return errors.New({{.JsonName}} + "格式错误")
 	}
 }
 `
 
 type handleFallback struct {
-	Name string
-	Typ  reflect.Type
-	Kind reflect.Kind
+	Name     string
+	JsonName string
+	Typ      reflect.Type
+	Kind     reflect.Kind
 }
 
 var handleFallbackTxt = `
@@ -150,12 +155,14 @@ var handleFallbackTxt = `
 	/* Falling back. type={{printf "%v" .Typ}} kind={{printf "%v" .Kind}} */
 	tbuf, err := fs.CaptureField(tok)
 	if err != nil {
-		return fs.WrapErr(err)
+		//return fs.WrapErr(err)
+		return errors.New({{.JsonName}} + "格式错误")
 	}
 
 	err = json.Unmarshal(tbuf, &{{.Name}})
 	if err != nil {
-		return fs.WrapErr(err)
+		//return fs.WrapErr(err)
+		return errors.New({{.JsonName}} + "格式错误")
 	}
 
 	//handleFallbackTxt
@@ -166,6 +173,7 @@ var handleFallbackTxt = `
 type handleString struct {
 	IC       *Inception
 	Name     string
+	JsonName string
 	Typ      reflect.Type
 	TakeAddr bool
 	Quoted   bool
@@ -175,7 +183,7 @@ var handleStringTxt = `
 {
 	{{$ic := .IC}}
 
-	{{getAllowTokens .Typ.Name "FFTok_string" "FFTok_null"}}
+	{{getAllowTokens .Typ.Name .JsonName "FFTok_string" "FFTok_null"}}
 	if tok == fflib.FFTok_null {
 	{{if eq .TakeAddr true}}
 		{{.Name}} = nil
@@ -202,6 +210,7 @@ var handleStringTxt = `
 type handleObject struct {
 	IC       *Inception
 	Name     string
+	JsonName string
 	Typ      reflect.Type
 	Ptr      reflect.Kind
 	TakeAddr bool
@@ -210,7 +219,7 @@ type handleObject struct {
 var handleObjectTxt = `
 {
 	{{$ic := .IC}}
-	{{getAllowTokens .Typ.Name "FFTok_left_bracket" "FFTok_null"}}
+	{{getAllowTokens .Typ.Name .JsonName "FFTok_left_bracket" "FFTok_null"}}
 	if tok == fflib.FFTok_null {
 		{{.Name}} = nil
 	} else {
@@ -277,23 +286,25 @@ var handleObjectTxt = `
 				if wantVal == true {
 					// TODO(pquerna): this isn't an ideal error message, this handles
 					// things like [,,,] as an array value.
-					return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					// return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					return errors.New({{.JsonName}} + "格式错误")
 				}
 				continue
 			} else {
 				wantVal = true
 			}
 
-			{{handleField .IC "k" .Typ.Key $keyPtr false}}
+			{{handleField .IC "k" .JsonName .Typ.Key $keyPtr false}}
 
 			// Expect ':' after key
 			tok = fs.Scan()
 			if tok != fflib.FFTok_colon {
-				return fs.WrapErr(fmt.Errorf("wanted colon token, but got token: %v", tok))
+				// return fs.WrapErr(fmt.Errorf("wanted colon token, but got token: %v", tok))
+				return errors.New({{.JsonName}} + "格式错误")
 			}
 
 			tok = fs.Scan()
-			{{handleField .IC $tmpVar .Typ.Elem $valPtr false}}
+			{{handleField .IC $tmpVar .JsonName .Typ.Elem $valPtr false}}
 
 			{{if eq .TakeAddr true}}
 			tval[k] = {{$tmpVar}}
@@ -316,6 +327,7 @@ var handleObjectTxt = `
 type handleArray struct {
 	IC              *Inception
 	Name            string
+	JsonName        string
 	Typ             reflect.Type
 	Ptr             reflect.Kind
 	UseReflectToSet bool
@@ -325,7 +337,7 @@ type handleArray struct {
 var handleArrayTxt = `
 {
 	{{$ic := .IC}}
-	{{getAllowTokens .Typ.Name "FFTok_left_brace" "FFTok_null"}}
+	{{getAllowTokens .Typ.Name .JsonName "FFTok_left_brace" "FFTok_null"}}
 	{{if eq .Typ.Elem.Kind .Ptr}}
 		{{.Name}} = [{{.Typ.Len}}]*{{getType $ic .Name .Typ.Elem.Elem}}{}
 	{{else}}
@@ -357,14 +369,15 @@ var handleArrayTxt = `
 				if wantVal == true {
 					// TODO(pquerna): this isn't an ideal error message, this handles
 					// things like [,,,] as an array value.
-					return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					// return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					return errors.New({{.JsonName}} + "格式错误")
 				}
 				continue
 			} else {
 				wantVal = true
 			}
 
-			{{handleField .IC $tmpVar .Typ.Elem $ptr false}}
+			{{handleField .IC $tmpVar .JsonName .Typ.Elem $ptr false}}
 
 			// Standard json.Unmarshal ignores elements out of array bounds,
 			// that what we do as well.
@@ -385,7 +398,7 @@ var handleArrayTxt = `
 var handleSliceTxt = `
 {
 	{{$ic := .IC}}
-	{{getAllowTokens .Typ.Name "FFTok_left_brace" "FFTok_null"}}
+	{{getAllowTokens .Typ.Name .JsonName "FFTok_left_brace" "FFTok_null"}}
 	if tok == fflib.FFTok_null {
 		{{.Name}} = nil
 	} else {
@@ -427,14 +440,15 @@ var handleSliceTxt = `
 				if wantVal == true {
 					// TODO(pquerna): this isn't an ideal error message, this handles
 					// things like [,,,] as an array value.
-					return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					// return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+					return errors.New({{.JsonName}} + "格式错误")
 				}
 				continue
 			} else {
 				wantVal = true
 			}
 
-			{{handleField .IC $tmpVar .Typ.Elem $ptr false}}
+			{{handleField .IC $tmpVar .JsonName .Typ.Elem $ptr false}}
 			{{if eq .IsPtr true}}
 				*{{.Name}} = append(*{{.Name}}, {{$tmpVar}})
 			{{else}}
@@ -451,14 +465,15 @@ var handleSliceTxt = `
 
 var handleByteSliceTxt = `
 {
-	{{getAllowTokens .Typ.Name "FFTok_string" "FFTok_null"}}
+	{{getAllowTokens .Typ.Name .JsonName "FFTok_string" "FFTok_null"}}
 	if tok == fflib.FFTok_null {
 		{{.Name}} = nil
 	} else {
 		b := make([]byte, base64.StdEncoding.DecodedLen(fs.Output.Len()))
 		n, err := base64.StdEncoding.Decode(b, fs.Output.Bytes())
 		if err != nil {
-			return fs.WrapErr(err)
+			// return fs.WrapErr(err)
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 		{{if eq .UseReflectToSet true}}
 			v := reflect.ValueOf(&{{.Name}}).Elem()
@@ -475,6 +490,7 @@ var handleByteSliceTxt = `
 
 type handleBool struct {
 	Name     string
+	JsonName string
 	Typ      reflect.Type
 	TakeAddr bool
 }
@@ -505,8 +521,9 @@ var handleBoolTxt = `
 			{{.Name}} = false
 		{{end}}
 		} else {
-			err = errors.New("unexpected bytes for true/false value")
-			return fs.WrapErr(err)
+			// err = errors.New("unexpected bytes for true/false value")
+			// return fs.WrapErr(err)
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 
 		{{if eq .TakeAddr true}}
@@ -520,10 +537,11 @@ var handleBoolTxt = `
 `
 
 type handlePtr struct {
-	IC     *Inception
-	Name   string
-	Typ    reflect.Type
-	Quoted bool
+	IC       *Inception
+	Name     string
+	JsonName string
+	Typ      reflect.Type
+	Quoted   bool
 }
 
 var handlePtrTxt = `
@@ -537,7 +555,7 @@ var handlePtrTxt = `
 			{{.Name}} = new({{getType $ic .Typ.Elem.Name .Typ.Elem}})
 		}
 
-		{{handleFieldAddr .IC .Name true .Typ.Elem false .Quoted}}
+		{{handleFieldAddr .IC .Name .JsonName true .Typ.Elem false .Quoted}}
 
 		//handlePtrTxt
 		{{getSetFieldMarkFunc .Name}}
@@ -643,21 +661,19 @@ func (uj *{{$.SI.Name}}) Set{{$field.Name}}(val {{getFieldType .Typ}}) {
 }
 {{end}}
 
-func (uj *{{$.SI.Name}}) autoSetFieldValue(jsonBytes *bytes.Buffer, typ, key, val string) {
+func (uj *{{$.SI.Name}}) autoSetFieldValue(jsonBytes *fflib.Buffer, typ, key, val string) {
 	strType := "string,tp.Datetime,time.Time"
 
 	if jsonBytes.Len() > 1 {
-		jsonBytes.WriteString(",")
+		jsonBytes.WriteByte(',')
 	}
 
-	jsonBytes.WriteString("\"")
+	jsonBytes.WriteByte('"')
 	jsonBytes.WriteString(key)
 	jsonBytes.WriteString("\":")
 
 	if strings.Contains(strType, typ) {
-		jsonBytes.WriteString("\"")
-		jsonBytes.WriteString(val)
-		jsonBytes.WriteString("\"")
+		fflib.WriteJsonString(jsonBytes, val)
 	} else {
 		jsonBytes.WriteString(val)
 	}
@@ -669,19 +685,20 @@ func (uj *{{$.SI.Name}}) AutoSetFieldValue(pm map[string]string) error {
 		return nil
 	}
 
-	jsonBytes := bytes.NewBufferString("{")
+	var jsonBytes fflib.Buffer
+	jsonBytes.WriteByte('{')
 	for k, v := range pm {
 		fieldName := strings.ToLower(k)
 		switch fieldName {
 			{{range $index, $field := $si.Fields}}
 			{{if ne $field.JsonName "-"}}
-			case strings.ToLower("{{$field.Name}}"):
-				uj.autoSetFieldValue(jsonBytes, "{{getFieldType .Typ}}", {{$field.JsonName}}, v)
+			case strings.ToLower({{$field.JsonName}}):
+				uj.autoSetFieldValue(&jsonBytes, "{{getFieldType .Typ}}", {{$field.JsonName}}, v)
 			{{end}}
 			{{end}}
 		}
 	}
-	jsonBytes.WriteString("}")
+	jsonBytes.WriteByte('}')
 
 	return uj.UnmarshalJSON(jsonBytes.Bytes())
 }
@@ -805,7 +822,7 @@ mainparse:
 {{range $index, $field := $si.Fields}}
 handle_{{$field.Name}}:
 	{{with $fieldName := $field.Name | printf "uj.%s"}}
-		{{handleField $ic $fieldName $field.Typ $field.Pointer $field.ForceString}}
+		{{handleField $ic $fieldName $field.JsonName $field.Typ $field.Pointer $field.ForceString}}
 		{{if eq $.ResetFields true}}
 		ffj_set_{{$si.Name}}_{{$field.Name}} = true
 		{{end}}
@@ -815,7 +832,13 @@ handle_{{$field.Name}}:
 {{end}}
 
 wantedvalue:
-	return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+	// return fs.WrapErr(fmt.Errorf("wanted value token, but got token: %v", tok))
+	switch currentKey {
+	{{range $index, $field := $si.Fields}}
+	case ffj_t_{{$si.Name}}_{{$field.Name}}:
+		return errors.New({{$field.JsonName}} + "格式错误")
+	{{end}}
+	}
 wrongtokenerror:
 	return fs.WrapErr(fmt.Errorf("ffjson: wanted token: %v, but got token: %v output=%s", wantedTok, tok, fs.Output.String()))
 tokerror:
@@ -862,6 +885,7 @@ done:
 type handleUnmarshaler struct {
 	IC                   *Inception
 	Name                 string
+	JsonName             string
 	Typ                  reflect.Type
 	Ptr                  reflect.Kind
 	TakeAddr             bool
@@ -896,7 +920,8 @@ var handleUnmarshalerTxt = `
 		{{end}}
 		err = {{.Name}}.UnmarshalJSONFFLexer(fs, fflib.FFParse_want_key)
 		if err != nil {
-			return err
+			// return err
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 		state = fflib.FFParse_after_value
 
@@ -916,7 +941,8 @@ var handleUnmarshalerTxt = `
 
 		tbuf, err := fs.CaptureField(tok)
 		if err != nil {
-			return fs.WrapErr(err)
+			// return fs.WrapErr(err)
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 
 		{{if eq .TakeAddr true }}
@@ -926,7 +952,8 @@ var handleUnmarshalerTxt = `
 		{{end}}
 		err = {{.Name}}.UnmarshalJSON(tbuf)
 		if err != nil {
-			return fs.WrapErr(err)
+			// return fs.WrapErr(err)
+			return errors.New({{.JsonName}} + "格式错误")
 		}
 		state = fflib.FFParse_after_value
 
