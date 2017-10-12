@@ -1,3 +1,9 @@
+# 注意
+
+这里是一个 ffjson 定制包，在 ffjson 的静态化解析json的基础上，增加了一些增强方法函数，实现对通过 json序列化和反序列化 对象的字段赋值判断。实现对“零值”字段的是否赋值识别。
+
+此定制主要为满足 yingshengtech 团队内部使用，与 xorm 相结合，不对其他团队或成员的使用提供保障。
+
 # ffjson: faster JSON for Go
 
 [![Build Status](https://travis-ci.org/pquerna/ffjson.svg?branch=master)](https://travis-ci.org/pquerna/ffjson)
