@@ -70,7 +70,7 @@ func autoImport(ic *Inception, typ reflect.Type) {
 	case "time.Time":
 		ic.OutputImports[`"time"`] = true
 	case "tp.Datetime":
-		ic.OutputImports[`"git.oschina.net/ystech/go-component/tp"`] = true
+		ic.OutputImports[`"gitee.com/ystech/go-component/tp"`] = true
 	}
 }
 
